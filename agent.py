@@ -8,15 +8,18 @@ from collections import deque
 import random
 
 class ChessAgent:
-    def __init__(self, color):
+    def __init__(self, color, initial_epsilon=0.9, epsilon_decay=0.99995, min_epsilon=0.05):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = ChessNet().to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
         self.color = color
         self.memory = deque(maxlen=100000)
+        self.epsilon = initial_epsilon
+        self.epsilon_decay = epsilon_decay
+        self.min_epsilon = min_epsilon
 
-    def select_action(self, state, legal_moves, epsilon=0.1):
-        if random.random() < epsilon:
+    def select_action(self, state, legal_moves):
+        if random.random() < self.epsilon:
             return random.choice(legal_moves)
         
         state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
@@ -37,6 +40,9 @@ class ChessAgent:
         # Choose move based on masked policy
         move_index = torch.multinomial(masked_policy, 1).item()
         return self.index_to_move(move_index)
+
+    def update_epsilon(self):
+        self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
     def store_transition(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
