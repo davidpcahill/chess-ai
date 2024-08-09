@@ -14,7 +14,7 @@ This project implements a chess AI using deep reinforcement learning and Monte C
 
 ## Setup and Installation
 
-1. Ensure you have Python 3.7+ installed.
+1. Ensure you have Python 3.7+ and pip installed.
 
 2. Clone this repository:
    ```
@@ -28,16 +28,16 @@ This project implements a chess AI using deep reinforcement learning and Monte C
    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
    ```
 
-4. Install the required packages:
-   ```
-   pip install -r requirements.txt
-   ```
-
-5. If you want to use GPU acceleration, install PyTorch with CUDA support:
+4. Install PyTorch with CUDA support (if you have a compatible GPU):
    ```
    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
    ```
    Note: This installs PyTorch with CUDA 11.8 support. Check the official PyTorch website for the appropriate command for your CUDA version.
+
+5. Install other required packages:
+   ```
+   pip install -r requirements.txt
+   ```
 
 6. Verify the installation by running the CUDA test script:
    ```
