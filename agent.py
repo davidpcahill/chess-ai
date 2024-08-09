@@ -11,11 +11,11 @@ import random
 
 class ChessAgent:
     def __init__(self, color, initial_epsilon=0.9, epsilon_decay=0.99995, min_epsilon=0.05):
+        self.color = 'white' if color == chess.WHITE else 'black'
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = ChessNet().to(self.device)
-        self.model_file = self.generate_model_filename(color)
+        self.model_file = self.generate_model_filename(self.color)
         self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
-        self.color = color
         self.memory = deque(maxlen=100000)
         self.epsilon = initial_epsilon
         self.epsilon_decay = epsilon_decay
@@ -39,7 +39,7 @@ class ChessAgent:
 
     def generate_model_filename(self, color):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return f"{color}_model_{timestamp}.pth"
+        return f"{color.lower()}_model_{timestamp}.pth"
 
     def select_action(self, state, legal_moves):
         if random.random() < self.epsilon:
