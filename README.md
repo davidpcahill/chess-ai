@@ -59,26 +59,31 @@ This will output information about CUDA availability and your GPU(s).
 
 Run the training script:
 ```
-python train.py [--episodes EPISODES] [--batch_size BATCH_SIZE] [--lr LEARNING_RATE]
+python train.py [--episodes EPISODES] [--batch_size BATCH_SIZE] [--lr LEARNING_RATE] [--white_model PATH] [--black_model PATH] [--log_interval INTERVAL] [--save_interval INTERVAL]
 ```
 
 Options:
 - `--episodes`: Number of training episodes (default: 100000)
-- `--batch_size`: Batch size for training (default: 64)
-- `--lr`: Learning rate (default: 0.001)
+- `--batch_size`: Batch size for training (default: 128)
+- `--lr`: Learning rate (default: 0.0005)
+- `--white_model`: Path to existing white model to resume training (optional)
+- `--black_model`: Path to existing black model to resume training (optional)
+- `--log_interval`: Interval for logging game results (default: 100)
+- `--save_interval`: Interval for saving models (default: 1000)
 
 Example:
 ```
-python train.py --episodes 500000 --batch_size 128 --lr 0.0005
+python train.py --episodes 500000 --batch_size 128 --lr 0.0005 --log_interval 50 --save_interval 5000
 ```
 
-This will start the training process. The script will print updates every 100 episodes, including:
+This will start the training process. The script will print updates every `log_interval` episodes, including:
 - Current episode number
 - Move history of the last game
 - Result of the last game
+- Current epsilon values for both agents
 - Evaluation of current models (based on 100 games played between white and black)
 
-The script will save model checkpoints periodically.
+The script will save model checkpoints every `save_interval` episodes. If no existing models are specified, new model files will be created with timestamps.
 
 ### Playing Games
 

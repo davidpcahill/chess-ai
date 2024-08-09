@@ -1,3 +1,5 @@
+import os
+from datetime import datetime
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
@@ -11,12 +13,33 @@ class ChessAgent:
     def __init__(self, color, initial_epsilon=0.9, epsilon_decay=0.99995, min_epsilon=0.05):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = ChessNet().to(self.device)
+        self.model_file = self.generate_model_filename(color)
         self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
         self.color = color
         self.memory = deque(maxlen=100000)
         self.epsilon = initial_epsilon
         self.epsilon_decay = epsilon_decay
         self.min_epsilon = min_epsilon
+
+    def load_model(self, model_path):
+        self.model.load_state_dict(torch.load(model_path))
+        self.model.eval()
+        self.model_file = os.path.basename(model_path)
+
+    def save_model(self):
+        directory = "models"
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        filename = os.path.join(directory, self.model_file)
+        torch.save(self.model.state_dict(), filename)
+
+    def initialize_model_file(self, color):
+        if self.model_file is None:
+            self.model_file = self.generate_model_filename(color)
+
+    def generate_model_filename(self, color):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return f"{color}_model_{timestamp}.pth"
 
     def select_action(self, state, legal_moves):
         if random.random() < self.epsilon:
@@ -26,20 +49,16 @@ class ChessAgent:
         with torch.no_grad():
             _, policy = self.model(state)
         
-        # Convert policy to probabilities and mask illegal moves
-        policy = torch.exp(policy).squeeze()
+        policy = policy.squeeze().cpu().numpy()
         legal_move_indices = [self.move_to_index(move) for move in legal_moves]
-        mask = torch.zeros_like(policy)
-        mask[legal_move_indices] = 1
-        masked_policy = policy * mask
+        legal_move_probs = policy[legal_move_indices]
         
-        # If all legal moves have zero probability, choose randomly
-        if masked_policy.sum() == 0:
+        if np.sum(legal_move_probs) == 0:
             return random.choice(legal_moves)
         
-        # Choose move based on masked policy
-        move_index = torch.multinomial(masked_policy, 1).item()
-        return self.index_to_move(move_index)
+        probs = legal_move_probs / np.sum(legal_move_probs)
+        chosen_idx = np.random.choice(len(legal_moves), p=probs)
+        return legal_moves[chosen_idx]
 
     def update_epsilon(self):
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)

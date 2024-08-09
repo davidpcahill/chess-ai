@@ -1,5 +1,7 @@
 import chess
-
+import chess.pgn
+import socket
+from datetime import datetime
 class ChessEnv:
     def __init__(self):
         self.board = chess.Board()
@@ -42,16 +44,63 @@ class ChessEnv:
         if self.board.is_checkmate():
             return 1 if self.board.turn == chess.BLACK else -1
         elif self.board.is_stalemate() or self.board.is_insufficient_material() or \
-             self.board.is_seventyfive_moves() or self.board.is_fivefold_repetition():
+            self.board.is_seventyfive_moves() or self.board.is_fivefold_repetition():
             return 0
-        else:
-            return 0
-
+        
+        # Piece values
+        piece_values = {
+            chess.PAWN: 1,
+            chess.KNIGHT: 3,
+            chess.BISHOP: 3,
+            chess.ROOK: 5,
+            chess.QUEEN: 9
+        }
+        
+        # Calculate material balance
+        material_balance = sum(len(self.board.pieces(piece_type, chess.WHITE)) * value
+                            for piece_type, value in piece_values.items()) - \
+                        sum(len(self.board.pieces(piece_type, chess.BLACK)) * value
+                            for piece_type, value in piece_values.items())
+        
+        # Reward for advancing pawns
+        white_pawn_rank_sum = sum(chess.square_rank(square) for square in self.board.pieces(chess.PAWN, chess.WHITE))
+        black_pawn_rank_sum = sum(7 - chess.square_rank(square) for square in self.board.pieces(chess.PAWN, chess.BLACK))
+        pawn_advance_reward = (white_pawn_rank_sum - black_pawn_rank_sum) * 0.1
+        
+        # Reward for pawn promotion
+        promotion_reward = 0
+        last_move = self.board.move_stack[-1] if self.board.move_stack else None
+        if last_move and last_move.promotion == chess.QUEEN:
+            promotion_reward = 8  # Reward for promoting to queen (9 - 1 for pawn value)
+        
+        # Combine rewards
+        reward = (material_balance + pawn_advance_reward + promotion_reward) * 0.01
+        
+        return reward if self.board.turn == chess.WHITE else -reward
+    
     def render(self):
         print(self.board)
 
     def get_legal_moves(self):
         return [move.uci() for move in self.board.legal_moves]
+
+    def get_pgn(self, white_agent, black_agent, episode=None):
+        game = chess.pgn.Game()
+        game.headers["Event"] = "AI Training Game"
+        game.headers["Site"] = socket.gethostname()
+        game.headers["Date"] = datetime.now().strftime("%Y.%m.%d")
+        game.headers["Round"] = str(episode) if episode is not None else "?"
+        game.headers["White"] = f"AI (epsilon: {white_agent.epsilon:.4f}, model: {white_agent.model_file or 'None'})"
+        game.headers["Black"] = f"AI (epsilon: {black_agent.epsilon:.4f}, model: {black_agent.model_file or 'None'})"
+        game.headers["Result"] = self.get_result() or "*"
+
+        node = game
+        for move in self.board.move_stack:
+            node = node.add_variation(move)
+
+        exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
+        pgn_string = game.accept(exporter)
+        return pgn_string
 
     def get_result(self):
         if self.board.is_checkmate():
