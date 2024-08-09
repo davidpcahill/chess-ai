@@ -8,18 +8,21 @@ class ChessNet(nn.Module):
         self.conv1 = nn.Conv2d(12, 256, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
-        self.fc1 = nn.Linear(256 * 8 * 8, 1024)
+        self.fc1 = nn.Linear(256 * 8 * 8 + 1, 1024)  # +1 for the player turn
         self.fc2 = nn.Linear(1024, 512)
         self.value_head = nn.Linear(512, 1)
         self.policy_head = nn.Linear(512, 64 * 64)
         self.dropout = nn.Dropout(0.3)
 
     def forward(self, x):
+        player = x[:, -1].unsqueeze(1)  # Extract player turn
+        x = x[:, :-1]  # Remove player turn from board state
         x = x.view(-1, 12, 8, 8)  # Reshape input to 12 channels (6 piece types * 2 colors)
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
         x = x.view(-1, 256 * 8 * 8)
+        x = torch.cat([x, player], dim=1)  # Concatenate player turn
         x = F.relu(self.fc1(x))
         x = self.dropout(x)
         x = F.relu(self.fc2(x))

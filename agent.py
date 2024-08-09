@@ -22,12 +22,25 @@ class ChessAgent:
         with torch.no_grad():
             _, policy = self.model(state)
         
-        legal_move_mask = torch.zeros(64 * 64).to(self.device)
+        # Convert policy to probabilities
+        policy = torch.exp(policy).squeeze()
+        
+        # Create a mask for legal moves
+        move_mask = torch.zeros_like(policy)
         for move in legal_moves:
-            legal_move_mask[self.move_to_index(move)] = 1
-        masked_policy = policy + torch.log(legal_move_mask)
-
-        move_index = torch.argmax(masked_policy).item()
+            move_index = self.move_to_index(move)
+            move_mask[move_index] = 1
+        
+        # Apply mask and renormalize
+        masked_policy = policy * move_mask
+        if masked_policy.sum() > 0:
+            masked_policy /= masked_policy.sum()
+        else:
+            # If no legal moves according to the policy, choose randomly
+            return random.choice(legal_moves)
+        
+        # Choose move based on masked policy
+        move_index = torch.multinomial(masked_policy, 1).item()
         return self.index_to_move(move_index)
 
     def store_transition(self, state, action, reward, next_state, done):
