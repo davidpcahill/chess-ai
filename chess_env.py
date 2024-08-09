@@ -13,12 +13,16 @@ class ChessEnv:
     def step(self, action):
         move = chess.Move.from_uci(action)
         if move in self.board.legal_moves:
+            san_move = self.board.san(move)  # Get SAN before pushing the move
             self.board.push(move)
-            self.move_history.append(self.board.san(move))
+            self.move_history.append(san_move)
             done = self.board.is_game_over()
             reward = self.get_reward()
             return self.get_state(), reward, done, {}
         else:
+            print(f"Illegal move attempted: {action}")
+            print(f"Current board state: {self.board.fen()}")
+            print(f"Legal moves: {[move.uci() for move in self.board.legal_moves]}")
             return self.get_state(), -1, True, {}
 
     def get_state(self):

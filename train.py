@@ -13,16 +13,13 @@ def self_play_game(white_agent, black_agent, env):
         else:
             action = black_agent.select_action(state, env.get_legal_moves())
         
-        # Debug print
-        print(f"Current board:\n{env.board}")
-        print(f"Selected move: {action}")
-        print(f"Legal moves: {env.get_legal_moves()}")
-        
-        if action not in env.get_legal_moves():
-            print(f"Illegal move attempted: {action}")
-            # Handle illegal move (e.g., select a random legal move instead)
-            action = random.choice(env.get_legal_moves())
-            print(f"Choosing random legal move instead: {action}")
+        # Ensure the move is legal
+        while chess.Move.from_uci(action) not in env.board.legal_moves:
+            print(f"Illegal move attempted during training: {action}")
+            if env.board.turn == chess.WHITE:
+                action = white_agent.select_action(state, env.get_legal_moves())
+            else:
+                action = black_agent.select_action(state, env.get_legal_moves())
         
         next_state, reward, done, _ = env.step(action)
         

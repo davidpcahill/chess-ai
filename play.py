@@ -92,7 +92,8 @@ def load_model(path):
 
 def get_ai_move(agent, board):
     mcts = MCTS(agent.model)
-    return mcts.search(board)
+    action = mcts.search(board)
+    return action
 
 def board_to_state(board):
     state = []
@@ -111,24 +112,42 @@ def print_board(board):
     print(board)
     print()
 
-def play_game(white_agent, black_agent, mode='ai_vs_ai'):
+def get_human_move(board):
+    while True:
+        move = input("Enter your move (in UCI format, e.g., e2e4): ")
+        try:
+            if chess.Move.from_uci(move) in board.legal_moves:
+                return move
+            else:
+                print("Illegal move. Try again.")
+        except ValueError:
+            print("Invalid input. Please use UCI format (e.g., e2e4)")
+
+def play_game(white_agent, black_agent):
     board = chess.Board()
-    
+    env = ChessEnv()
+
+    human_color = input("Choose your color (white/black): ").lower()
+    human_is_white = human_color == "white"
+
     while not board.is_game_over():
         print_board(board)
         
         if board.turn == chess.WHITE:
-            if mode == 'human_vs_ai' and white_agent is None:
-                move = input("Enter your move (in UCI format, e.g., e2e4): ")
+            if human_is_white:
+                move = get_human_move(board)
             else:
                 move = get_ai_move(white_agent, board)
+                print(f"White AI moves: {move}")
         else:
-            if mode == 'ai_vs_human' and black_agent is None:
-                move = input("Enter your move (in UCI format, e.g., e7e5): ")
+            if not human_is_white:
+                move = get_human_move(board)
             else:
                 move = get_ai_move(black_agent, board)
+                print(f"Black AI moves: {move}")
         
         board.push_uci(move)
+        env.board = board  # Update the environment's board
     
     print_board(board)
     print(f"Game Over. Result: {board.result()}")
@@ -143,13 +162,4 @@ if __name__ == "__main__":
     black_agent = ChessAgent(chess.BLACK)
     black_agent.model = black_model
     
-    mode = input("Choose mode (ai_vs_ai, human_vs_ai, ai_vs_human): ")
-    
-    if mode == 'ai_vs_ai':
-        play_game(white_agent, black_agent)
-    elif mode == 'human_vs_ai':
-        play_game(None, black_agent, mode)
-    elif mode == 'ai_vs_human':
-        play_game(white_agent, None, mode)
-    else:
-        print("Invalid mode selected.")
+    play_game(white_agent, black_agent)

@@ -22,21 +22,15 @@ class ChessAgent:
         with torch.no_grad():
             _, policy = self.model(state)
         
-        # Convert policy to probabilities
+        # Convert policy to probabilities and mask illegal moves
         policy = torch.exp(policy).squeeze()
+        legal_move_indices = [self.move_to_index(move) for move in legal_moves]
+        mask = torch.zeros_like(policy)
+        mask[legal_move_indices] = 1
+        masked_policy = policy * mask
         
-        # Create a mask for legal moves
-        move_mask = torch.zeros_like(policy)
-        for move in legal_moves:
-            move_index = self.move_to_index(move)
-            move_mask[move_index] = 1
-        
-        # Apply mask and renormalize
-        masked_policy = policy * move_mask
-        if masked_policy.sum() > 0:
-            masked_policy /= masked_policy.sum()
-        else:
-            # If no legal moves according to the policy, choose randomly
+        # If all legal moves have zero probability, choose randomly
+        if masked_policy.sum() == 0:
             return random.choice(legal_moves)
         
         # Choose move based on masked policy
