@@ -18,8 +18,8 @@ This project implements a chess AI using deep reinforcement learning and Monte C
 
 2. Clone this repository:
    ```
-   git clone https://github.com/yourusername/chess-ai-project.git
-   cd chess-ai-project
+   git clone https://github.com/yourusername/chess-ai.git
+   cd chess-ai
    ```
 
 3. (Optional) Create and activate a virtual environment:
