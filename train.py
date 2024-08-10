@@ -75,9 +75,9 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
     # Metrics tracking
     window_size = 1000
     game_lengths = deque(maxlen=window_size)
-    white_win_rates = deque(maxlen=window_size)
-    black_win_rates = deque(maxlen=window_size)
-    draw_rates = deque(maxlen=window_size)
+    white_wins = deque(maxlen=window_size)
+    black_wins = deque(maxlen=window_size)
+    draws = deque(maxlen=window_size)
     avg_rewards = deque(maxlen=window_size)
 
     for episode in range(num_episodes):
@@ -92,27 +92,36 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
 
         # Update metrics
         game_lengths.append(actual_move_count)
-        white_win_rates.append(1 if result.startswith("1-0") else 0)
-        black_win_rates.append(1 if result.startswith("0-1") else 0)
-        draw_rates.append(1 if result.startswith("1/2-1/2") else 0)
+        if result.startswith("1-0"):
+            white_wins.append(1)
+            black_wins.append(0)
+            draws.append(0)
+        elif result.startswith("0-1"):
+            white_wins.append(0)
+            black_wins.append(1)
+            draws.append(0)
+        else:
+            white_wins.append(0)
+            black_wins.append(0)
+            draws.append(1)
         avg_rewards.append(total_reward / actual_move_count if actual_move_count > 0 else 0)
 
         if episode % args.log_interval == 0:
+            # Evaluate agents
+            eval_white_wins, eval_black_wins, eval_draws = evaluate(white_agent, black_agent)
+            logger.info(f"Evaluation (100 games): White wins: {eval_white_wins}, Black wins: {eval_black_wins}, Draws: {eval_draws}")
+            
             logger.info(f"Episode {episode}")
             logger.info(f"Game result: {result}")
             logger.info(f"Move count: {actual_move_count}")
             logger.info(f"Epsilon: White {white_agent.epsilon:.4f}, Black {black_agent.epsilon:.4f}")
-            logger.info(f"Performance metrics (last {args.log_interval} games):")
+            logger.info(f"Performance metrics (last {min(episode+1, window_size)} games):")
             logger.info(f"  Avg game length: {sum(game_lengths) / len(game_lengths):.2f}")
-            logger.info(f"  Win rates: White {sum(white_win_rates) / len(white_win_rates):.2f}, Black {sum(black_win_rates) / len(black_win_rates):.2f}")
-            logger.info(f"  Draw rate: {sum(draw_rates) / len(draw_rates):.2f}")
+            logger.info(f"  Win rates: White {sum(white_wins) / len(white_wins):.2f}, Black {sum(black_wins) / len(black_wins):.2f}")
+            logger.info(f"  Draw rate: {sum(draws) / len(draws):.2f}")
             logger.info(f"  Avg reward per move: {sum(avg_rewards) / len(avg_rewards):.4f}")
             logger.info(f"Training metrics:")
             logger.info(f"  Gradient norm: White {white_grad_norm:.4f}, Black {black_grad_norm:.4f}")
-            
-            # Evaluate agents
-            eval_white_wins, eval_black_wins, eval_draws = evaluate(white_agent, black_agent)
-            logger.info(f"Evaluation (100 games): White wins: {eval_white_wins}, Black wins: {eval_black_wins}, Draws: {eval_draws}")
             
             # Output move history on separate lines
             logger.info("\n" + move_history)
