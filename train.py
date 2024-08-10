@@ -1,3 +1,5 @@
+import os
+from datetime import datetime
 from chess_env import ChessEnv
 from agent import ChessAgent
 import argparse
@@ -122,6 +124,10 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
             # Evaluate agents
             eval_white_wins, eval_black_wins, eval_draws = evaluate(white_agent, black_agent)
             logger.info(f"Evaluation (100 games): White wins: {eval_white_wins}, Black wins: {eval_black_wins}, Draws: {eval_draws}")
+
+            # Save replay HTML
+            replay_path = save_replay_html(move_history, episode, white_agent, black_agent)
+            logger.info(f"Replay saved: {replay_path}")
             
             # Output move history on separate lines
             logger.info("\n" + move_history)
@@ -135,6 +141,36 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
 
     logger.info("Training completed.")
     
+def save_replay_html(pgn, episode, white_agent, black_agent):
+    replay_dir = "replays"
+    if not os.path.exists(replay_dir):
+        os.makedirs(replay_dir)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"replay_episode_{episode}_{timestamp}.html"
+    filepath = os.path.join(replay_dir, filename)
+
+    html_content = f"""
+<html>
+<head>
+<link rel="stylesheet" type="text/css" href="https://pgn.chessbase.com/CBReplay.css"/>
+<title>Chess AI Replay - Episode {episode}</title>
+</head>
+<body>
+<div class="cbreplay">
+{pgn}
+</div>
+<script src="https://pgn.chessbase.com/jquery-3.0.0.min.js"></script>
+<script src="https://pgn.chessbase.com/cbreplay.js" type="text/javascript"></script>    
+</body>
+</html>
+    """
+
+    with open(filepath, 'w') as f:
+        f.write(html_content)
+
+    return filepath
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train chess AI")
     parser.add_argument("--episodes", type=int, default=100000, help="Number of training episodes")
