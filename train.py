@@ -78,7 +78,6 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
     white_win_rates = deque(maxlen=window_size)
     black_win_rates = deque(maxlen=window_size)
     draw_rates = deque(maxlen=window_size)
-    illegal_move_counts = deque(maxlen=window_size)
     avg_rewards = deque(maxlen=window_size)
 
     for episode in range(num_episodes):
@@ -96,15 +95,7 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
         white_win_rates.append(1 if result.startswith("1-0") else 0)
         black_win_rates.append(1 if result.startswith("0-1") else 0)
         draw_rates.append(1 if result.startswith("1/2-1/2") else 0)
-        illegal_move_counts.append(illegal_move_attempts)
         avg_rewards.append(total_reward / actual_move_count if actual_move_count > 0 else 0)
-
-        # Calculate average reward
-        total_rewards = white_agent.recent_rewards + black_agent.recent_rewards
-        if total_rewards:
-            avg_rewards.append(sum(total_rewards) / len(total_rewards))
-        else:
-            avg_rewards.append(0)
 
         if episode % args.log_interval == 0:
             logger.info(f"Episode {episode}")
@@ -123,6 +114,7 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
             eval_white_wins, eval_black_wins, eval_draws = evaluate(white_agent, black_agent)
             logger.info(f"Evaluation (100 games): White wins: {eval_white_wins}, Black wins: {eval_black_wins}, Draws: {eval_draws}")
             logger.info("")
+
 
         # Save models periodically
         if episode % args.save_interval == 0:
