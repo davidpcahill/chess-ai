@@ -44,7 +44,7 @@ def evaluate(white_agent, black_agent, num_games=100):
     draws = 0
 
     for episode in range(num_games):
-        result, _, _, _, _ = self_play_game(white_agent, black_agent, env, episode)
+        result, _, _, _ = self_play_game(white_agent, black_agent, env, episode)
         if result.startswith("1-0"):
             white_wins += 1
         elif result.startswith("0-1"):
