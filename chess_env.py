@@ -2,22 +2,26 @@ import chess
 import chess.pgn
 import socket
 from datetime import datetime
+
 class ChessEnv:
     def __init__(self):
         self.board = chess.Board()
         self.move_history = []
+        self.move_count = 0
 
     def reset(self):
         self.board.reset()
         self.move_history = []
+        self.move_count = 0
         return self.get_state()
 
     def step(self, action):
         move = chess.Move.from_uci(action)
         if move in self.board.legal_moves:
-            san_move = self.board.san(move)  # Get SAN before pushing the move
+            san_move = self.board.san(move)
             self.board.push(move)
             self.move_history.append(san_move)
+            self.move_count += 1
             done = self.board.is_game_over()
             reward = self.get_reward()
             return self.get_state(), reward, done, {}
@@ -25,7 +29,7 @@ class ChessEnv:
             print(f"Illegal move attempted: {action}")
             print(f"Current board state: {self.board.fen()}")
             print(f"Legal moves: {[move.uci() for move in self.board.legal_moves]}")
-            return self.get_state(), -1, True, {}
+            return self.get_state(), -1, False, {"illegal_move": True}
 
     def get_state(self):
         state = []
@@ -90,9 +94,10 @@ class ChessEnv:
         game.headers["Site"] = socket.gethostname()
         game.headers["Date"] = datetime.now().strftime("%Y.%m.%d")
         game.headers["Round"] = str(episode) if episode is not None else "?"
-        game.headers["White"] = f"AI (epsilon: {white_agent.epsilon:.4f}, model: {white_agent.model_file or 'None'})"
-        game.headers["Black"] = f"AI (epsilon: {black_agent.epsilon:.4f}, model: {black_agent.model_file or 'None'})"
+        game.headers["White"] = f"AI (epsilon: {white_agent.epsilon:.4f}, model: {white_agent.model_file})"
+        game.headers["Black"] = f"AI (epsilon: {black_agent.epsilon:.4f}, model: {black_agent.model_file})"
         game.headers["Result"] = self.get_result() or "*"
+        game.headers["PlyCount"] = str(self.move_count)
 
         node = game
         for move in self.board.move_stack:
@@ -101,15 +106,19 @@ class ChessEnv:
         exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
         pgn_string = game.accept(exporter)
         return pgn_string
+    
+    def is_game_over(self):
+        return self.board.is_game_over(claim_draw=True)
 
     def get_result(self):
         if self.board.is_checkmate():
             return "1-0" if self.board.turn == chess.BLACK else "0-1"
         elif self.board.is_stalemate() or self.board.is_insufficient_material() or \
-             self.board.is_seventyfive_moves() or self.board.is_fivefold_repetition():
+            self.board.is_seventyfive_moves() or self.board.is_fivefold_repetition():
             return "1/2-1/2"
-        else:
-            return None
+        elif self.board.is_game_over(claim_draw=True):
+            return "1/2-1/2"
+        return None
 
     def get_move_history(self):
         return " ".join(self.move_history)

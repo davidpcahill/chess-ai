@@ -20,6 +20,7 @@ class ChessAgent:
         self.epsilon = initial_epsilon
         self.epsilon_decay = epsilon_decay
         self.min_epsilon = min_epsilon
+        self.illegal_moves = {}
 
     def load_model(self, model_path):
         self.model.load_state_dict(torch.load(model_path))
@@ -41,16 +42,35 @@ class ChessAgent:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return f"{color.lower()}_model_{timestamp}.pth"
 
+    def state_to_key(self, state):
+        # Convert state to a hashable type (e.g., tuple)
+        return tuple(state)
+
+    def update_illegal_move(self, state, action):
+        state_key = self.state_to_key(state)
+        if state_key not in self.illegal_moves:
+            self.illegal_moves[state_key] = set()
+        self.illegal_moves[state_key].add(action)
+
     def select_action(self, state, legal_moves):
         if random.random() < self.epsilon:
             return random.choice(legal_moves)
         
-        state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+        state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            _, policy = self.model(state)
+            _, policy = self.model(state_tensor)
         
         policy = policy.squeeze().cpu().numpy()
         legal_move_indices = [self.move_to_index(move) for move in legal_moves]
+        
+        # Apply penalties to known illegal moves
+        state_key = self.state_to_key(state)
+        if state_key in self.illegal_moves:
+            for illegal_move in self.illegal_moves[state_key]:
+                illegal_index = self.move_to_index(illegal_move)
+                if illegal_index in legal_move_indices:
+                    policy[illegal_index] *= 0.5  # Reduce probability by 50%
+        
         legal_move_probs = policy[legal_move_indices]
         
         if np.sum(legal_move_probs) == 0:
@@ -87,7 +107,16 @@ class ChessAgent:
 
         policy_loss = -torch.mean(torch.sum(policy * F.one_hot(action, 64*64), dim=1) * (td_target - value.squeeze(1)).detach())
 
-        loss = value_loss + policy_loss
+        # Add penalty for known illegal moves
+        illegal_move_loss = 0
+        for i, s in enumerate(state):
+            state_key = self.state_to_key(s.cpu().numpy())
+            if state_key in self.illegal_moves:
+                for illegal_move in self.illegal_moves[state_key]:
+                    illegal_index = self.move_to_index(illegal_move)
+                    illegal_move_loss += policy[i, illegal_index]
+
+        loss = value_loss + policy_loss + 0.1 * illegal_move_loss
 
         self.optimizer.zero_grad()
         loss.backward()

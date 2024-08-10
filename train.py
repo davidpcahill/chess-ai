@@ -6,26 +6,42 @@ import chess.pgn
 import torch
 import random
 
-def self_play_game(white_agent, black_agent, env, episode=None):
+def self_play_game(white_agent, black_agent, env, episode, max_moves=200):
     state = env.reset()
-    done = False
-    while not done:
+    for move_count in range(max_moves):
+        if env.board.is_game_over():
+            break
+        
+        current_player = white_agent if env.board.turn == chess.WHITE else black_agent
         legal_moves = env.get_legal_moves()
-        if env.board.turn == chess.WHITE:
-            action = white_agent.select_action(state, legal_moves)
-        else:
-            action = black_agent.select_action(state, legal_moves)
         
-        next_state, reward, done, _ = env.step(action)
+        while True:
+            action = current_player.select_action(state, legal_moves)
+            next_state, reward, done, info = env.step(action)
+            
+            if info.get("illegal_move"):
+                current_player.update_illegal_move(state, action)
+                continue
+            else:
+                break
         
-        if env.board.turn == chess.WHITE:
-            white_agent.store_transition(state, action, reward, next_state, done)
-        else:
-            black_agent.store_transition(state, action, -reward, next_state, done)
-        
+        current_player.store_transition(state, action, reward, next_state, done)
         state = next_state
+        
+        if done:
+            break
 
-    return env.get_result(), env.get_pgn(white_agent, black_agent, episode)
+    # Force end of game if max_moves is reached
+    if move_count == max_moves - 1:
+        done = True
+        result = "1/2-1/2"  # Draw if max moves reached
+    else:
+        result = env.get_result()
+
+    if result is None:
+        result = "*"
+    
+    return result, env.get_pgn(white_agent, black_agent, episode)
 
 def evaluate(white_agent, black_agent, num_games=100):
     env = ChessEnv()
