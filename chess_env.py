@@ -79,7 +79,7 @@ class ChessEnv:
                     danger_penalty -= piece_values.get(piece.piece_type, 0) * 0.1
         
         # Combine rewards
-        reward = (material_balance + promotion_reward + danger_penalty) * 0.01
+        reward = (material_balance + promotion_reward + danger_penalty)
         
         return reward if self.board.turn == chess.WHITE else -reward
     

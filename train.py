@@ -83,12 +83,13 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
         black_agent.initialize_model_file('black')
 
     # Metrics tracking
-    game_lengths = deque(maxlen=100)
-    white_win_rates = deque(maxlen=100)
-    black_win_rates = deque(maxlen=100)
-    draw_rates = deque(maxlen=100)
-    illegal_move_counts = deque(maxlen=100)
-    avg_rewards = deque(maxlen=100)
+    window_size = 1000
+    game_lengths = deque(maxlen=window_size)
+    white_win_rates = deque(maxlen=window_size)
+    black_win_rates = deque(maxlen=window_size)
+    draw_rates = deque(maxlen=window_size)
+    illegal_move_counts = deque(maxlen=window_size)
+    avg_rewards = deque(maxlen=window_size)
 
     for episode in range(num_episodes):
         result, move_history, actual_move_count, illegal_move_attempts = self_play_game(white_agent, black_agent, env, episode)
@@ -107,19 +108,19 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
         draw_rates.append(1 if result.startswith("1/2-1/2") else 0)
         illegal_move_counts.append(illegal_move_attempts)
 
-        # Safely calculate average reward
+        # Calculate average reward
         total_rewards = white_agent.recent_rewards + black_agent.recent_rewards
         if total_rewards:
             avg_rewards.append(sum(total_rewards) / len(total_rewards))
         else:
-            avg_rewards.append(0)  # Append 0 if no rewards are available
+            avg_rewards.append(0)
 
         if episode % args.log_interval == 0:
             logger.info(f"Episode {episode}")
             logger.info(f"Game result: {result}")
             logger.info(f"Move history: {move_history}")
             logger.info(f"Actual move count: {actual_move_count}")
-            logger.info(f"Illegal move attempts: {illegal_move_attempts}")  # Add this line
+            logger.info(f"Illegal move attempts: {illegal_move_attempts}")
             logger.info(f"White epsilon: {white_agent.epsilon:.4f}")
             logger.info(f"Black epsilon: {black_agent.epsilon:.4f}")
             logger.info(f"Avg game length: {sum(game_lengths) / len(game_lengths):.2f}")
@@ -128,8 +129,6 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
             logger.info(f"Draw rate: {sum(draw_rates) / len(draw_rates):.2f}")
             logger.info(f"Avg illegal moves per game: {sum(illegal_move_counts) / len(illegal_move_counts):.2f}")
             logger.info(f"Avg reward: {sum(avg_rewards) / len(avg_rewards):.4f}")
-            
-            # Log network statistics
             logger.info(f"White gradient norm: {white_grad_norm:.4f}")
             logger.info(f"Black gradient norm: {black_grad_norm:.4f}")
             
