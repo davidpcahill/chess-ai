@@ -95,19 +95,6 @@ def get_ai_move(agent, board):
     action = mcts.search(board)
     return action
 
-def board_to_state(board):
-    state = []
-    for square in chess.SQUARES:
-        piece = board.piece_at(square)
-        if piece is None:
-            state.extend([0] * 12)
-        else:
-            state.extend([1 if piece.piece_type == pt and piece.color == color else 0
-                          for color in [chess.WHITE, chess.BLACK]
-                          for pt in range(1, 7)])
-    state.append(1 if board.turn == chess.WHITE else 0)
-    return state
-
 def print_board(board):
     print(board)
     print()

@@ -10,22 +10,26 @@ from collections import deque
 import random
 
 class ChessAgent:
-    def __init__(self, color, initial_epsilon=0.9, epsilon_decay=0.99995, min_epsilon=0.05):
+    def __init__(self, color, initial_epsilon=0.9, epsilon_decay=0.99995, min_epsilon=0.05, lr=0.001):
         self.color = 'white' if color == chess.WHITE else 'black'
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = ChessNet().to(self.device)
         self.model_file = self.generate_model_filename(self.color)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=lr)  # Use the lr parameter here
         self.memory = deque(maxlen=100000)
         self.epsilon = initial_epsilon
         self.epsilon_decay = epsilon_decay
         self.min_epsilon = min_epsilon
         self.illegal_moves = {}
+        self.illegal_moves_counter = 0
+        self.recent_rewards = deque(maxlen=100)
 
-    def load_model(self, model_path):
-        self.model.load_state_dict(torch.load(model_path))
-        self.model.eval()
-        self.model_file = os.path.basename(model_path)
+    def load_model(path):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = ChessNet().to(device)
+        model.load_state_dict(torch.load(path, map_location=device))
+        model.eval()
+        return model
 
     def save_model(self):
         directory = "models"
@@ -42,15 +46,30 @@ class ChessAgent:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return f"{color.lower()}_model_{timestamp}.pth"
 
+    def store_transition(self, state, action, reward, next_state, done):
+        self.memory.append((state, action, reward, next_state, done))
+        self.recent_rewards.append(reward)
+
     def state_to_key(self, state):
         # Convert state to a hashable type (e.g., tuple)
         return tuple(state)
+
+    def clear_old_illegal_moves(self, max_size=10000):
+        if len(self.illegal_moves) > max_size:
+            # Remove oldest entries
+            sorted_moves = sorted(self.illegal_moves.items(), key=lambda x: len(x[1]), reverse=True)
+            self.illegal_moves = dict(sorted_moves[:max_size])
 
     def update_illegal_move(self, state, action):
         state_key = self.state_to_key(state)
         if state_key not in self.illegal_moves:
             self.illegal_moves[state_key] = set()
         self.illegal_moves[state_key].add(action)
+        self.illegal_moves_counter += 1
+
+        # Call clear_old_illegal_moves every 1000 illegal moves
+        if self.illegal_moves_counter % 1000 == 0:
+            self.clear_old_illegal_moves()
 
     def select_action(self, state, legal_moves):
         if random.random() < self.epsilon:
@@ -58,7 +77,9 @@ class ChessAgent:
         
         state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            _, policy = self.model(state_tensor)
+            self.model.eval()  # Set the model to evaluation mode
+            value, policy = self.model(state_tensor)
+            self.model.train()  # Set the model back to training mode
         
         policy = policy.squeeze().cpu().numpy()
         legal_move_indices = [self.move_to_index(move) for move in legal_moves]
@@ -88,7 +109,7 @@ class ChessAgent:
 
     def update(self, batch_size=32):
         if len(self.memory) < batch_size:
-            return
+            return 0
 
         batch = random.sample(self.memory, batch_size)
         state, action, reward, next_state, done = zip(*batch)
@@ -121,6 +142,8 @@ class ChessAgent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+        
+        return loss.item()
 
     def move_to_index(self, move):
         from_square = chess.SQUARE_NAMES.index(move[:2])

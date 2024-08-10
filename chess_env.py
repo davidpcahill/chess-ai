@@ -88,6 +88,19 @@ class ChessEnv:
     def get_legal_moves(self):
         return [move.uci() for move in self.board.legal_moves]
 
+    def board_to_state(self):
+        state = []
+        for square in chess.SQUARES:
+            piece = self.board.piece_at(square)
+            if piece is None:
+                state.extend([0] * 12)
+            else:
+                state.extend([1 if piece.piece_type == pt and piece.color == color else 0
+                            for color in [chess.WHITE, chess.BLACK]
+                            for pt in range(1, 7)])
+        state.append(1 if self.board.turn == chess.WHITE else 0)
+        return state
+
     def get_pgn(self, white_agent, black_agent, episode=None):
         game = chess.pgn.Game()
         game.headers["Event"] = "AI Training Game"
@@ -97,7 +110,7 @@ class ChessEnv:
         game.headers["White"] = f"AI (epsilon: {white_agent.epsilon:.4f}, model: {white_agent.model_file})"
         game.headers["Black"] = f"AI (epsilon: {black_agent.epsilon:.4f}, model: {black_agent.model_file})"
         game.headers["Result"] = self.get_result() or "*"
-        game.headers["PlyCount"] = str(self.move_count)
+        game.headers["PlyCount"] = str(len(self.board.move_stack))
 
         node = game
         for move in self.board.move_stack:
