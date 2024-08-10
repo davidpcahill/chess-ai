@@ -56,7 +56,7 @@ def evaluate(white_agent, black_agent, num_games=100):
     draws = 0
 
     for episode in range(num_games):
-        result, _, _, _ = self_play_game(white_agent, black_agent, env, episode)
+        result, _, _, _, _ = self_play_game(white_agent, black_agent, env, episode)
         if result.startswith("1-0"):
             white_wins += 1
         elif result.startswith("0-1"):
@@ -121,23 +121,21 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
         if episode % args.log_interval == 0:
             logger.info(f"Episode {episode}")
             logger.info(f"Game result: {result}")
-            logger.info(f"Move history: {move_history}")
-            logger.info(f"Actual move count: {actual_move_count}")
+            logger.info(f"Move count: {actual_move_count}")
             logger.info(f"Illegal move attempts: {illegal_move_attempts}")
-            logger.info(f"White epsilon: {white_agent.epsilon:.4f}")
-            logger.info(f"Black epsilon: {black_agent.epsilon:.4f}")
-            logger.info(f"Avg game length: {sum(game_lengths) / len(game_lengths):.2f}")
-            logger.info(f"White win rate: {sum(white_win_rates) / len(white_win_rates):.2f}")
-            logger.info(f"Black win rate: {sum(black_win_rates) / len(black_win_rates):.2f}")
-            logger.info(f"Draw rate: {sum(draw_rates) / len(draw_rates):.2f}")
-            logger.info(f"Avg illegal moves per game: {sum(illegal_move_counts) / len(illegal_move_counts):.2f}")
-            logger.info(f"Avg reward: {sum(avg_rewards) / len(avg_rewards):.4f}")
-            logger.info(f"White gradient norm: {white_grad_norm:.4f}")
-            logger.info(f"Black gradient norm: {black_grad_norm:.4f}")
+            logger.info(f"Epsilon: White {white_agent.epsilon:.4f}, Black {black_agent.epsilon:.4f}")
+            logger.info(f"Performance metrics (last {args.log_interval} games):")
+            logger.info(f"  Avg game length: {sum(game_lengths) / len(game_lengths):.2f}")
+            logger.info(f"  Win rates: White {sum(white_win_rates) / len(white_win_rates):.2f}, Black {sum(black_win_rates) / len(black_win_rates):.2f}")
+            logger.info(f"  Draw rate: {sum(draw_rates) / len(draw_rates):.2f}")
+            logger.info(f"  Avg illegal moves per game: {sum(illegal_move_counts) / len(illegal_move_counts):.2f}")
+            logger.info(f"  Avg reward per move: {sum(avg_rewards) / len(avg_rewards):.4f}")
+            logger.info(f"Training metrics:")
+            logger.info(f"  Gradient norm: White {white_grad_norm:.4f}, Black {black_grad_norm:.4f}")
             
             # Evaluate agents
             eval_white_wins, eval_black_wins, eval_draws = evaluate(white_agent, black_agent)
-            logger.info(f"Evaluation: White wins: {eval_white_wins}, Black wins: {eval_black_wins}, Draws: {eval_draws}")
+            logger.info(f"Evaluation (100 games): White wins: {eval_white_wins}, Black wins: {eval_black_wins}, Draws: {eval_draws}")
             logger.info("")
 
         # Save models periodically
