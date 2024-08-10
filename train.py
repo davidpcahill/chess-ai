@@ -107,10 +107,6 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
         avg_rewards.append(total_reward / actual_move_count if actual_move_count > 0 else 0)
 
         if episode % args.log_interval == 0:
-            # Evaluate agents
-            eval_white_wins, eval_black_wins, eval_draws = evaluate(white_agent, black_agent)
-            logger.info(f"Evaluation (100 games): White wins: {eval_white_wins}, Black wins: {eval_black_wins}, Draws: {eval_draws}")
-            
             logger.info(f"Episode {episode}")
             logger.info(f"Game result: {result}")
             logger.info(f"Move count: {actual_move_count}")
@@ -123,10 +119,14 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
             logger.info(f"Training metrics:")
             logger.info(f"  Gradient norm: White {white_grad_norm:.4f}, Black {black_grad_norm:.4f}")
             
+            # Evaluate agents
+            eval_white_wins, eval_black_wins, eval_draws = evaluate(white_agent, black_agent)
+            logger.info(f"Evaluation (100 games): White wins: {eval_white_wins}, Black wins: {eval_black_wins}, Draws: {eval_draws}")
+            
             # Output move history on separate lines
             logger.info("\n" + move_history)
             
-            logger.info("")
+            logger.info("Training...")
 
         # Save models periodically
         if episode % args.save_interval == 0:
