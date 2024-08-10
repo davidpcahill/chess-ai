@@ -147,7 +147,6 @@ class ChessAgent:
 
         policy_loss = -torch.mean(torch.sum(policy * F.one_hot(action, 64*64), dim=1) * (td_target - value.squeeze(1)).detach())
 
-        # Add penalty for known illegal moves
         illegal_move_loss = 0
         for i, s in enumerate(state):
             state_key = self.state_to_key(s.cpu().numpy())
@@ -161,11 +160,13 @@ class ChessAgent:
         self.optimizer.zero_grad()
         loss.backward()
         
-        # Add gradient clipping
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+        # Calculate gradient norm before clipping
+        grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
         
         self.optimizer.step()
         self.scheduler.step()
+
+        return grad_norm.item()  # Return the gradient norm
 
     def state_to_key(self, state):
         return tuple(state)

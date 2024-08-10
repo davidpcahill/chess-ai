@@ -127,11 +127,18 @@ class ChessEnv:
     def get_result(self):
         if self.board.is_checkmate():
             return "1-0" if self.board.turn == chess.BLACK else "0-1"
-        elif self.board.is_stalemate() or self.board.is_insufficient_material() or \
-            self.board.is_seventyfive_moves() or self.board.is_fivefold_repetition():
-            return "1/2-1/2"
-        elif self.board.is_game_over(claim_draw=True):
-            return "1/2-1/2"
+        elif self.board.is_stalemate():
+            return "1/2-1/2 (Stalemate)"
+        elif self.board.is_insufficient_material():
+            return "1/2-1/2 (Insufficient Material)"
+        elif self.board.is_seventyfive_moves():
+            return "1/2-1/2 (75-move rule)"
+        elif self.board.is_fivefold_repetition():
+            return "1/2-1/2 (Fivefold Repetition)"
+        elif self.board.can_claim_draw():
+            return "1/2-1/2 (Draw Claim)"
+        elif self.board.is_game_over():
+            return "1/2-1/2 (Other Draw)"
         return None
 
     def get_move_history(self):

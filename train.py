@@ -10,6 +10,7 @@ from collections import deque
 
 def self_play_game(white_agent, black_agent, env, episode, max_moves=200):
     state = env.reset()
+    illegal_move_attempts = 0
     for move_count in range(max_moves):
         if env.board.is_game_over():
             break
@@ -18,20 +19,13 @@ def self_play_game(white_agent, black_agent, env, episode, max_moves=200):
         current_player.update_board(env.board)
         legal_moves = env.get_legal_moves()
         
-        illegal_move_attempts = 0
-        while True:
-            action = current_player.select_action(state, legal_moves)
-            next_state, reward, done, info = env.step(action)
-            
-            if info.get("illegal_move"):
-                current_player.update_illegal_move(state, action)
-                illegal_move_attempts += 1
-                if illegal_move_attempts > 10:  # Prevent infinite loops
-                    done = True
-                    break
-                continue
-            else:
-                break
+        action = current_player.select_action(state, legal_moves)
+        next_state, reward, done, info = env.step(action)
+        
+        if info.get("illegal_move"):
+            illegal_move_attempts += 1
+            current_player.update_illegal_move(state, action)
+            continue
         
         current_player.store_transition(state, action, reward, next_state, done)
         state = next_state
@@ -42,16 +36,16 @@ def self_play_game(white_agent, black_agent, env, episode, max_moves=200):
     # Force end of game if max_moves is reached
     if move_count == max_moves - 1:
         done = True
-        result = "1/2-1/2"  # Draw if max moves reached
+        result = "1/2-1/2 (Max Moves)"
     else:
         result = env.get_result()
 
     if result is None:
-        result = "1/2-1/2"  # Change '*' to '1/2-1/2' for incomplete games
+        result = "1/2-1/2 (Incomplete Game)"
 
     actual_move_count = len(env.board.move_stack)
     
-    return result, env.get_pgn(white_agent, black_agent, episode), actual_move_count
+    return result, env.get_pgn(white_agent, black_agent, episode), actual_move_count, illegal_move_attempts
 
 def evaluate(white_agent, black_agent, num_games=100):
     env = ChessEnv()
@@ -60,10 +54,10 @@ def evaluate(white_agent, black_agent, num_games=100):
     draws = 0
 
     for episode in range(num_games):
-        result, _, _ = self_play_game(white_agent, black_agent, env, episode)
-        if result == "1-0":
+        result, _, _, _ = self_play_game(white_agent, black_agent, env, episode)
+        if result.startswith("1-0"):
             white_wins += 1
-        elif result == "0-1":
+        elif result.startswith("0-1"):
             black_wins += 1
         else:
             draws += 1
@@ -97,10 +91,10 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
     avg_rewards = deque(maxlen=100)
 
     for episode in range(num_episodes):
-        result, move_history, actual_move_count = self_play_game(white_agent, black_agent, env, episode)
+        result, move_history, actual_move_count, illegal_move_attempts = self_play_game(white_agent, black_agent, env, episode)
         
-        white_agent.update(args.batch_size)
-        black_agent.update(args.batch_size)
+        white_grad_norm = white_agent.update(args.batch_size)
+        black_grad_norm = black_agent.update(args.batch_size)
 
         # Update epsilon
         white_agent.update_epsilon()
@@ -108,10 +102,10 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
 
         # Update metrics
         game_lengths.append(actual_move_count)
-        white_win_rates.append(1 if result == "1-0" else 0)
-        black_win_rates.append(1 if result == "0-1" else 0)
-        draw_rates.append(1 if result == "1/2-1/2" else 0)
-        illegal_move_counts.append(white_agent.illegal_moves_counter + black_agent.illegal_moves_counter)
+        white_win_rates.append(1 if result.startswith("1-0") else 0)
+        black_win_rates.append(1 if result.startswith("0-1") else 0)
+        draw_rates.append(1 if result.startswith("1/2-1/2") else 0)
+        illegal_move_counts.append(illegal_move_attempts)
 
         # Safely calculate average reward
         total_rewards = white_agent.recent_rewards + black_agent.recent_rewards
@@ -125,6 +119,7 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
             logger.info(f"Game result: {result}")
             logger.info(f"Move history: {move_history}")
             logger.info(f"Actual move count: {actual_move_count}")
+            logger.info(f"Illegal move attempts: {illegal_move_attempts}")  # Add this line
             logger.info(f"White epsilon: {white_agent.epsilon:.4f}")
             logger.info(f"Black epsilon: {black_agent.epsilon:.4f}")
             logger.info(f"Avg game length: {sum(game_lengths) / len(game_lengths):.2f}")
@@ -135,8 +130,6 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
             logger.info(f"Avg reward: {sum(avg_rewards) / len(avg_rewards):.4f}")
             
             # Log network statistics
-            white_grad_norm = sum(p.grad.data.norm(2).item() ** 2 for p in white_agent.model.parameters() if p.grad is not None) ** 0.5
-            black_grad_norm = sum(p.grad.data.norm(2).item() ** 2 for p in black_agent.model.parameters() if p.grad is not None) ** 0.5
             logger.info(f"White gradient norm: {white_grad_norm:.4f}")
             logger.info(f"Black gradient norm: {black_grad_norm:.4f}")
             
