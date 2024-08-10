@@ -111,6 +111,10 @@ saved_games/
 *.json
 logs/
 
+# New additions
+replays/
+models/
+
 # Operating system-related files
 # macOS
 .DS_Store
