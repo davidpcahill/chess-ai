@@ -113,8 +113,13 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
             # Evaluate agents
             eval_white_wins, eval_black_wins, eval_draws = evaluate(white_agent, black_agent)
             logger.info(f"Evaluation (100 games): White wins: {eval_white_wins}, Black wins: {eval_black_wins}, Draws: {eval_draws}")
-            logger.info("")
-
+            
+            # Output PGN on separate lines
+            logger.info("Game PGN:")
+            for line in pgn.split('\n'):
+                logger.info(line)
+            
+            logger.info("")  # Add an empty line for better readability between episodes
 
         # Save models periodically
         if episode % args.save_interval == 0:
