@@ -15,6 +15,7 @@ def self_play_game(white_agent, black_agent, env, episode, max_moves=200):
             break
         
         current_player = white_agent if env.board.turn == chess.WHITE else black_agent
+        current_player.update_board(env.board)
         legal_moves = env.get_legal_moves()
         
         illegal_move_attempts = 0

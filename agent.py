@@ -3,6 +3,7 @@ from datetime import datetime
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import StepLR
 import numpy as np
 from model import ChessNet
 import chess
@@ -10,12 +11,14 @@ from collections import deque
 import random
 
 class ChessAgent:
-    def __init__(self, color, initial_epsilon=0.9, epsilon_decay=0.99995, min_epsilon=0.05, lr=0.001):
+    def __init__(self, color, initial_epsilon=0.9, epsilon_decay=0.9999, min_epsilon=0.01, lr=0.001):
+        self.board = chess.Board()
         self.color = 'white' if color == chess.WHITE else 'black'
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = ChessNet().to(self.device)
         self.model_file = self.generate_model_filename(self.color)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=lr)  # Use the lr parameter here
+        self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
+        self.scheduler = StepLR(self.optimizer, step_size=1000, gamma=0.9)
         self.memory = deque(maxlen=100000)
         self.epsilon = initial_epsilon
         self.epsilon_decay = epsilon_decay
@@ -50,10 +53,6 @@ class ChessAgent:
         self.memory.append((state, action, reward, next_state, done))
         self.recent_rewards.append(reward)
 
-    def state_to_key(self, state):
-        # Convert state to a hashable type (e.g., tuple)
-        return tuple(state)
-
     def clear_old_illegal_moves(self, max_size=10000):
         if len(self.illegal_moves) > max_size:
             # Remove oldest entries
@@ -72,14 +71,20 @@ class ChessAgent:
             self.clear_old_illegal_moves()
 
     def select_action(self, state, legal_moves):
+        # Check for obvious captures or promotions
+        for move in legal_moves:
+            chess_move = chess.Move.from_uci(move)
+            if self.board.is_capture(chess_move) or chess_move.promotion:
+                return move
+
         if random.random() < self.epsilon:
             return random.choice(legal_moves)
         
         state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            self.model.eval()  # Set the model to evaluation mode
+            self.model.eval()
             value, policy = self.model(state_tensor)
-            self.model.train()  # Set the model back to training mode
+            self.model.train()
         
         policy = policy.squeeze().cpu().numpy()
         legal_move_indices = [self.move_to_index(move) for move in legal_moves]
@@ -94,12 +99,26 @@ class ChessAgent:
         
         legal_move_probs = policy[legal_move_indices]
         
+        # Ensure probabilities are non-negative
+        legal_move_probs = np.maximum(legal_move_probs, 0)
+        
         if np.sum(legal_move_probs) == 0:
             return random.choice(legal_moves)
+
+        # Apply progressive widening
+        n_consider = max(1, int(len(legal_moves) * (1 - self.epsilon)))
+        top_moves = sorted(zip(legal_moves, legal_move_probs), key=lambda x: x[1], reverse=True)[:n_consider]
         
-        probs = legal_move_probs / np.sum(legal_move_probs)
-        chosen_idx = np.random.choice(len(legal_moves), p=probs)
-        return legal_moves[chosen_idx]
+        # Ensure we have positive probabilities
+        top_move_probs = [prob for _, prob in top_moves]
+        if sum(top_move_probs) == 0:
+            return random.choice(legal_moves)
+        
+        chosen_move, _ = random.choices([move for move, _ in top_moves], weights=top_move_probs, k=1)[0]
+        return chosen_move
+
+    def update_board(self, board):
+        self.board = board
 
     def update_epsilon(self):
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
@@ -141,10 +160,16 @@ class ChessAgent:
 
         self.optimizer.zero_grad()
         loss.backward()
-        self.optimizer.step()
         
-        return loss.item()
+        # Add gradient clipping
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+        
+        self.optimizer.step()
+        self.scheduler.step()
 
+    def state_to_key(self, state):
+        return tuple(state)
+    
     def move_to_index(self, move):
         from_square = chess.SQUARE_NAMES.index(move[:2])
         to_square = chess.SQUARE_NAMES.index(move[2:4])

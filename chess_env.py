@@ -47,9 +47,6 @@ class ChessEnv:
     def get_reward(self):
         if self.board.is_checkmate():
             return 1 if self.board.turn == chess.BLACK else -1
-        elif self.board.is_stalemate() or self.board.is_insufficient_material() or \
-            self.board.is_seventyfive_moves() or self.board.is_fivefold_repetition():
-            return 0
         
         # Piece values
         piece_values = {
@@ -57,7 +54,8 @@ class ChessEnv:
             chess.KNIGHT: 3,
             chess.BISHOP: 3,
             chess.ROOK: 5,
-            chess.QUEEN: 9
+            chess.QUEEN: 9,
+            chess.KING: 0  # King's value doesn't change
         }
         
         # Calculate material balance
@@ -66,19 +64,22 @@ class ChessEnv:
                         sum(len(self.board.pieces(piece_type, chess.BLACK)) * value
                             for piece_type, value in piece_values.items())
         
-        # Reward for advancing pawns
-        white_pawn_rank_sum = sum(chess.square_rank(square) for square in self.board.pieces(chess.PAWN, chess.WHITE))
-        black_pawn_rank_sum = sum(7 - chess.square_rank(square) for square in self.board.pieces(chess.PAWN, chess.BLACK))
-        pawn_advance_reward = (white_pawn_rank_sum - black_pawn_rank_sum) * 0.1
-        
         # Reward for pawn promotion
         promotion_reward = 0
         last_move = self.board.move_stack[-1] if self.board.move_stack else None
-        if last_move and last_move.promotion == chess.QUEEN:
-            promotion_reward = 8  # Reward for promoting to queen (9 - 1 for pawn value)
+        if last_move and last_move.promotion:
+            promotion_reward = piece_values[last_move.promotion] - piece_values[chess.PAWN]
+        
+        # Penalize for putting pieces in danger
+        danger_penalty = 0
+        for square in chess.SQUARES:
+            piece = self.board.piece_at(square)
+            if piece:
+                if self.board.is_attacked_by(not piece.color, square):
+                    danger_penalty -= piece_values.get(piece.piece_type, 0) * 0.1
         
         # Combine rewards
-        reward = (material_balance + pawn_advance_reward + promotion_reward) * 0.01
+        reward = (material_balance + promotion_reward + danger_penalty) * 0.01
         
         return reward if self.board.turn == chess.WHITE else -reward
     
