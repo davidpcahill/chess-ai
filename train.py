@@ -10,7 +10,6 @@ from collections import deque
 
 def self_play_game(white_agent, black_agent, env, episode, max_moves=200):
     state = env.reset()
-    illegal_move_attempts = 0
     total_reward = 0
     for move_count in range(max_moves):
         if env.board.is_game_over():
@@ -23,31 +22,20 @@ def self_play_game(white_agent, black_agent, env, episode, max_moves=200):
         action = current_player.select_action(state, legal_moves)
         next_state, reward, done, info = env.step(action)
         
-        if info.get("illegal_move"):
-            illegal_move_attempts += 1
-            current_player.update_illegal_move(state, action)
-            continue
-        
-        total_reward += abs(reward)  # Accumulate absolute reward
+        total_reward += abs(reward)
         current_player.store_transition(state, action, reward, next_state, done)
         state = next_state
         
         if done:
             break
 
-    # Force end of game if max_moves is reached
-    if move_count == max_moves - 1:
-        done = True
-        result = "1/2-1/2 (Max Moves)"
-    else:
-        result = env.get_result()
-
+    result = env.get_result()
     if result is None:
         result = "1/2-1/2 (Incomplete Game)"
 
     actual_move_count = len(env.board.move_stack)
     
-    return result, env.get_pgn(white_agent, black_agent, episode), actual_move_count, illegal_move_attempts, total_reward
+    return result, env.get_pgn(white_agent, black_agent, episode), actual_move_count, total_reward
 
 def evaluate(white_agent, black_agent, num_games=100):
     env = ChessEnv()
@@ -94,7 +82,7 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
     avg_rewards = deque(maxlen=window_size)
 
     for episode in range(num_episodes):
-        result, move_history, actual_move_count, illegal_move_attempts, total_reward = self_play_game(white_agent, black_agent, env, episode)
+        result, move_history, actual_move_count, total_reward = self_play_game(white_agent, black_agent, env, episode)
         
         white_grad_norm = white_agent.update(args.batch_size)
         black_grad_norm = black_agent.update(args.batch_size)
@@ -122,13 +110,11 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
             logger.info(f"Episode {episode}")
             logger.info(f"Game result: {result}")
             logger.info(f"Move count: {actual_move_count}")
-            logger.info(f"Illegal move attempts: {illegal_move_attempts}")
             logger.info(f"Epsilon: White {white_agent.epsilon:.4f}, Black {black_agent.epsilon:.4f}")
             logger.info(f"Performance metrics (last {args.log_interval} games):")
             logger.info(f"  Avg game length: {sum(game_lengths) / len(game_lengths):.2f}")
             logger.info(f"  Win rates: White {sum(white_win_rates) / len(white_win_rates):.2f}, Black {sum(black_win_rates) / len(black_win_rates):.2f}")
             logger.info(f"  Draw rate: {sum(draw_rates) / len(draw_rates):.2f}")
-            logger.info(f"  Avg illegal moves per game: {sum(illegal_move_counts) / len(illegal_move_counts):.2f}")
             logger.info(f"  Avg reward per move: {sum(avg_rewards) / len(avg_rewards):.4f}")
             logger.info(f"Training metrics:")
             logger.info(f"  Gradient norm: White {white_grad_norm:.4f}, Black {black_grad_norm:.4f}")

@@ -89,14 +89,6 @@ class ChessAgent:
         policy = policy.squeeze().cpu().numpy()
         legal_move_indices = [self.move_to_index(move) for move in legal_moves]
         
-        # Apply penalties to known illegal moves
-        state_key = self.state_to_key(state)
-        if state_key in self.illegal_moves:
-            for illegal_move in self.illegal_moves[state_key]:
-                illegal_index = self.move_to_index(illegal_move)
-                if illegal_index in legal_move_indices:
-                    policy[illegal_index] *= 0.5  # Reduce probability by 50%
-        
         legal_move_probs = policy[legal_move_indices]
         
         # Ensure probabilities are non-negative

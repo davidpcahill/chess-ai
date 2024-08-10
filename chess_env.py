@@ -26,10 +26,7 @@ class ChessEnv:
             reward = self.get_reward()
             return self.get_state(), reward, done, {}
         else:
-            print(f"Illegal move attempted: {action}")
-            print(f"Current board state: {self.board.fen()}")
-            print(f"Legal moves: {[move.uci() for move in self.board.legal_moves]}")
-            return None, -1, False, {"illegal_move": True}
+            raise ValueError(f"Illegal move attempted: {action}")
 
     def get_state(self):
         state = []
