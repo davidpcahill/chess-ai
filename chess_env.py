@@ -29,7 +29,7 @@ class ChessEnv:
             print(f"Illegal move attempted: {action}")
             print(f"Current board state: {self.board.fen()}")
             print(f"Legal moves: {[move.uci() for move in self.board.legal_moves]}")
-            return self.get_state(), -1, False, {"illegal_move": True}
+            return None, -1, False, {"illegal_move": True}
 
     def get_state(self):
         state = []
@@ -79,7 +79,7 @@ class ChessEnv:
                     danger_penalty -= piece_values.get(piece.piece_type, 0) * 0.1
         
         # Combine rewards
-        reward = (material_balance + promotion_reward + danger_penalty)
+        reward = (material_balance + promotion_reward + danger_penalty) * 0.01
         
         return reward if self.board.turn == chess.WHITE else -reward
     

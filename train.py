@@ -11,6 +11,7 @@ from collections import deque
 def self_play_game(white_agent, black_agent, env, episode, max_moves=200):
     state = env.reset()
     illegal_move_attempts = 0
+    total_reward = 0
     for move_count in range(max_moves):
         if env.board.is_game_over():
             break
@@ -27,6 +28,7 @@ def self_play_game(white_agent, black_agent, env, episode, max_moves=200):
             current_player.update_illegal_move(state, action)
             continue
         
+        total_reward += abs(reward)  # Accumulate absolute reward
         current_player.store_transition(state, action, reward, next_state, done)
         state = next_state
         
@@ -45,7 +47,7 @@ def self_play_game(white_agent, black_agent, env, episode, max_moves=200):
 
     actual_move_count = len(env.board.move_stack)
     
-    return result, env.get_pgn(white_agent, black_agent, episode), actual_move_count, illegal_move_attempts
+    return result, env.get_pgn(white_agent, black_agent, episode), actual_move_count, illegal_move_attempts, total_reward
 
 def evaluate(white_agent, black_agent, num_games=100):
     env = ChessEnv()
@@ -92,7 +94,7 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
     avg_rewards = deque(maxlen=window_size)
 
     for episode in range(num_episodes):
-        result, move_history, actual_move_count, illegal_move_attempts = self_play_game(white_agent, black_agent, env, episode)
+        result, move_history, actual_move_count, illegal_move_attempts, total_reward = self_play_game(white_agent, black_agent, env, episode)
         
         white_grad_norm = white_agent.update(args.batch_size)
         black_grad_norm = black_agent.update(args.batch_size)
@@ -107,6 +109,7 @@ def train(num_episodes, white_model_path=None, black_model_path=None):
         black_win_rates.append(1 if result.startswith("0-1") else 0)
         draw_rates.append(1 if result.startswith("1/2-1/2") else 0)
         illegal_move_counts.append(illegal_move_attempts)
+        avg_rewards.append(total_reward / actual_move_count if actual_move_count > 0 else 0)
 
         # Calculate average reward
         total_rewards = white_agent.recent_rewards + black_agent.recent_rewards
